@@ -1,20 +1,46 @@
-// src/auth/jwt.strategy.ts
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-jwt";
+import { Student } from "src/student/entities/student.entity";
+import { StudentService } from "src/student/student.service";
+import { ExtractJwt, StrategyOptions } from 'passport-jwt';
+import { Request } from 'express';
 
-import { Injectable } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy, StrategyOptions } from 'passport-jwt';
+const cookieExtractor = (req: Request): string | null => {
+  return req?.cookies?.['isAuthenticated'] || null;
+};
+
+const jwtFromRequest = (req: Request) => {
+  const authHeaderToken = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+  if (authHeaderToken) return authHeaderToken;
+  return cookieExtractor(req);
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
-    const opts: StrategyOptions = {
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  constructor(private readonly studentService: StudentService) {
+   super({
+      jwtFromRequest: jwtFromRequest,
       secretOrKey: process.env.JWT_SECRET!,
-    };
-    super(opts);
+    });
   }
 
   async validate(payload: any) {
-    return { id: payload.sub, email: payload.email };
+
+      console.log('JWT payload:', payload);
+
+  if (!payload.email) {
+    throw new UnauthorizedException('Token payload missing email');
   }
+  
+    const user = await this.studentService.findEmail(payload.email);
+
+    if (!user) {
+      throw new UnauthorizedException('Login first to access this endpoints');
+    }
+   return { id: user.id, email: user.email };
+  }
+
+
+  
 }

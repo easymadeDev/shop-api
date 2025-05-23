@@ -20,11 +20,11 @@ export class AuthService {
     const exists = await this.studentModel.findOne({ email: dto.email });
     if (exists) throw new ConflictException('Email already in use');
 
-    const hashed = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
     const student = new this.studentModel({
       fullName: dto.fullName,
       email: dto.email,
-      password: hashed,
+      password: hashedPassword,
     });
     await student.save();
     return { message: 'Registration successful' };
@@ -34,12 +34,12 @@ export class AuthService {
   const student = await this.studentModel.findOne({ email: dto.email });
 
   if (!student) {
-    throw new UnauthorizedException('Invalid credentials');
+    throw new UnauthorizedException('Invalid Email');
   }
 
-  const isMatch = await bcrypt.compare(dto.password, student.password);
-  if (!isMatch) {
-    throw new UnauthorizedException('Invalid credentials');
+  const isPasswordVaild = await bcrypt.compare(dto.password, student.password);
+  if (!isPasswordVaild) {
+    throw new UnauthorizedException('Invalid password');
   }
 
   const payload = { sub: student.id, email: student.email };
@@ -54,6 +54,8 @@ export class AuthService {
       email: student.email,
     },
   };
+
+  
 }
 
 }

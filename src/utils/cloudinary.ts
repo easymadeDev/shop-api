@@ -4,14 +4,14 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-// ✅ Cloudinary configuration
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ Export the Multer storage for file uploads
+
 export const storage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {

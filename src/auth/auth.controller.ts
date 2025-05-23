@@ -1,11 +1,11 @@
 // src/auth/auth.controller.ts
 
-import { Controller, Post, Body, UseGuards, Get, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Req, Res } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterStudentDto } from './dto/register-student.dto';
 import { LoginStudentDto } from './dto/login-student.dto';
 import { JwtAuthGuard } from './jwt-auth/jwt-auth.guard';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -23,7 +23,28 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Req() req: Request) {
-    return { id: (req.user as any).id, email: (req.user as any).email };
+  async getProfile(@Req() req: Request) {
+    const user = req.user as any;
+    return {
+      id: user.id,
+      email: user.email,
+    };
+  }
+
+
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  logout(@Res() res: Response) {
+  
+    res.clearCookie('isAuthenticated', {
+      httpOnly: true,
+      sameSite: 'lax', 
+      secure: process.env.NODE_ENV === 'production', 
+      path: '/'
+    });
+
+  
+    return res.json({ message: 'Logged out successfully' });
   }
 }

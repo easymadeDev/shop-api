@@ -27,6 +27,7 @@ export class Student {
  
   @Prop()
   cloudinaryId?: string;
+  id: any;
 }
 
 export const StudentSchema = SchemaFactory.createForClass(Student);

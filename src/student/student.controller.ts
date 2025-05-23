@@ -1,30 +1,19 @@
-// src/student/student.controller.ts
 
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Req,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-  Delete,
-  Param,
-} from '@nestjs/common';
+
+import { Controller, Post, Get, Body, Req, UploadedFile, UseGuards, UseInterceptors, Delete, Param, Res, Patch } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { storage } from 'src/utils/cloudinary';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { Express } from 'express';
 import { LoginStudentDto } from 'src/auth/dto/login-student.dto';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { Roles } from 'src/auth/roles.decorator';
 
 
-@Controller('students')
+@Controller('student')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
 
@@ -32,14 +21,15 @@ export class StudentController {
   @UseInterceptors(FileInterceptor('image', { storage }))
   async registerStudent(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: CreateStudentDto,
-  ) {
-    return this.studentService.register(body, file);
+    @Body() CreateStudentDto: CreateStudentDto) {
+    return this.studentService.register(CreateStudentDto, file);
   }
 
   @Post('login')
-  async login(@Body() body: LoginStudentDto) {
-    return this.studentService.login(body);
+  async login(@Body() CreateStudentDto: LoginStudentDto) {
+    return this.studentService.login(CreateStudentDto);
+
+
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -66,21 +56,54 @@ export class StudentController {
   @UseGuards(JwtAuthGuard)
   @Get('profile/me')
   getProfile(@Req() req) {
-    return this.studentService.getProfile(req.user.id);
+ 
+   return req.user;
   }
 
   // Update profile picture
   @UseGuards(JwtAuthGuard)
-  @Post('profile/upload')
+  @Patch('profile/updatepics')
   @UseInterceptors(FileInterceptor('image', { storage }))
-  async uploadProfile(@UploadedFile() file: Express.Multer.File, @Req() req) {
-    return this.studentService.updateProfilePic(req.user.id, file);
+  async uploadProfile(@UploadedFile() file: Express.Multer.File, 
+  @Req() req: Request) {
+   const user = req.user as { id: string };
+
+    return this.studentService.updateProfilePic(user.id, file);
+    
   }
-  @UseGuards(JwtAuthGuard)
-  @Get('profile')
-  profile(@Req() req) {
-    return this.studentService.getProfile(req.user.id);
-  }
+
+@UseGuards(JwtAuthGuard)
+@UseInterceptors(FileInterceptor('profilePic'))
+@Post('updateinfo')
+async updateStudentInfo(
+  @Req() req,
+  @UploadedFile() file: Express.Multer.File,
+  @Body() body: any
+) {
+  const updateData: Partial<CreateStudentDto> = {};
+
+  if (body.fullName) updateData.fullName = body.fullName;
+  if (body.email) updateData.email = body.email;
+  if (body.password) updateData.password = body.password;
+  if (body.role) updateData.role = body.role;
+  if (file) updateData.profilePic = file.path;
+
+  return this.studentService.updateStudent(req.user.id, updateData);
+}
+
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
+@Patch('resetpassword/:id')
+async resetPassword(@Param('id') id: string, @Body('newPassword') newPassword: string) {
+  return this.studentService.resetPassword(id, newPassword);
+}
+
+  // @UseGuards(JwtAuthGuard)
+  // @Get('profile')
+  // profile(@Req() req) {
+  //   return this.studentService.getProfile(req.user.id);
+  // }
 
 
   // @UseGuards(JwtAuthGuard)
@@ -106,6 +129,11 @@ export class StudentController {
   async delete(@Param('id') id: string) {
     return this.studentService.delete(id);
   }
+ @Post('logout')
+  logout(@Req() req: Request, @Res() res: Response) {
+    return this.studentService.logout(req, res);
 
+    
+  }
 
 }

@@ -8,11 +8,12 @@ import { AuthService } from './auth.service';
 import { Student, StudentSchema } from '../student/entities/student.entity';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt-auth/jwt.strategy';
+import { StudentModule } from 'src/student/student.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Student.name, schema: StudentSchema }]),
-    PassportModule,
+    PassportModule, StudentModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
       signOptions: { expiresIn: '1d' },
@@ -20,6 +21,6 @@ import { JwtStrategy } from './jwt-auth/jwt.strategy';
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, JwtStrategy],
 })
 export class AuthModule {}
