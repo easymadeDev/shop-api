@@ -1,6 +1,6 @@
 // src/student/student.service.ts
 
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Student, StudentDocument } from './entities/student.entity';
 import { Model } from 'mongoose';
@@ -58,24 +58,38 @@ export class StudentService {
 
   return { message: 'Registered successfully' };
 }
-  async login(dto: LoginStudentDto) {
-    const student = await this.studentModel.findOne({ email: dto.email });
-    if (!student) throw new UnauthorizedException('Invalid email');
+  async login(dto: LoginStudentDto, res: Response) {
+  const student = await this.studentModel.findOne({ email: dto.email });
+  if (!student) throw new UnauthorizedException('Invalid email');
 
-    const isMatch = await bcrypt.compare(dto.password, student.password);
-    if (!isMatch) throw new UnauthorizedException('Invalid password');
+  const isMatch = await bcrypt.compare(dto.password, student.password);
+  if (!isMatch) throw new UnauthorizedException('Invalid password');
 
-    // const token = this.jwtService.sign({ id: student._id, email: student.email });
-    // return { token };
+  const token = jwt.sign(
+    { id: student._id, email: student.email, role: student.role },
+    process.env.JWT_SECRET!,
+    { expiresIn: '1h' }
+  );
 
-      const token = jwt.sign(
-      { id: student._id, email: student.email, role: student.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
-    );
-    return { message: 'Login successful', token };
+  // Set token as cookie
+  res.cookie('jwt', token, {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 1000, // 1 hour
+  });
 
-  }
+  return res.status(200).json({
+    message: 'Login successful',
+    student: {
+      id: student._id,
+      fullName: student.fullName,
+      email: student.email,
+      role: student.role,
+    },
+  });
+}
+
 
  
   async getProfile(id: string) {
@@ -155,11 +169,13 @@ async resetPassword(id: string, newPassword: string) {
 }
 
 async logout(req: Request, res: Response) {
+  res.clearCookie('jwt');
+  return res.status(200).json({ message: 'User successfully logged out' });
+}
 
-    res.clearCookie('isAuthenticated');
 
-    return res.status(200).json({ message: 'User successfully logged out' });
-  }
+    // return res.status(200).json({ message: 'User successfully logged out' });
+  
 
 
   async findEmail(email: string): Promise<Student | null> {

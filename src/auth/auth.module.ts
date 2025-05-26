@@ -10,10 +10,11 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt-auth/jwt.strategy';
 import { StudentModule } from 'src/student/student.module';
 
+
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Student.name, schema: StudentSchema }]),
-    PassportModule, StudentModule,
+    PassportModule,  StudentModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET!,
       signOptions: { expiresIn: '1d' },

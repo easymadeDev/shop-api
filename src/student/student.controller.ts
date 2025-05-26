@@ -26,8 +26,8 @@ export class StudentController {
   }
 
   @Post('login')
-  async login(@Body() CreateStudentDto: LoginStudentDto) {
-    return this.studentService.login(CreateStudentDto);
+  async login(@Body() CreateStudentDto: LoginStudentDto, @Res() res: Response) {
+    return this.studentService.login(CreateStudentDto, res);
 
 
   }

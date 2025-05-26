@@ -1,30 +1,38 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 
+interface JwtPayload {
+  userId: string;
+  email: string;
+  // add other claims
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
-    // Try to get token from cookie
+    // Token from cookie or Authorization header
     const tokenFromCookie = request.cookies?.isAuthenticated;
-
-    // Try to get token from Authorization header
     const authHeader = request.headers.authorization;
-    const tokenFromHeader = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    const tokenFromHeader = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
 
-    // If no token in either location, throw error
     const token = tokenFromHeader || tokenFromCookie;
+
     if (!token) {
       throw new UnauthorizedException('Missing authentication token');
     }
 
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is not defined in environment variables');
+    }
+
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
       request.user = decoded;
       return true;
     } catch (err) {
-      throw new UnauthorizedException('Token expired or invalid');
+      throw new UnauthorizedException(err.message || 'Token expired or invalid');
     }
   }
 }
