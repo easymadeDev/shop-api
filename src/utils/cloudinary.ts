@@ -1,9 +1,9 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import * as dotenv from 'dotenv';
+import { Request } from 'express';
 
 dotenv.config();
-
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
@@ -14,10 +14,14 @@ cloudinary.config({
 
 export const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => {
+  params: async (req: Request, file: Express.Multer.File) => {
+    const originalName = file.originalname.replace(/\.[^/.]+$/, '');
+    const extension = file.mimetype.split('/')[1]; 
+
     return {
       folder: 'school-api',
-      format: file.mimetype.split('/')[1],
+      public_id: originalName,
+      format: extension,
       transformation: [{ width: 500, height: 500, crop: 'limit' }],
     };
   },

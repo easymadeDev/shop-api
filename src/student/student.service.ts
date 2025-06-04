@@ -9,37 +9,22 @@ import * as bcrypt from 'bcrypt';
 import * as jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 
-import cloudinary from 'src/utils/cloudinary';
-import { LoginStudentDto } from 'src/auth/dto/login-student.dto';
+import cloudinary from '../utils/cloudinary';
+import { LoginStudentDto } from '../auth/dto/login-student.dto';
 
 @Injectable()
 export class StudentService {
-   // const token = this.jwtService.sign({ id: student._id, email: student.email });
-  // return { token };
+
     constructor(
     @InjectModel(Student.name) private studentModel: Model<StudentDocument>,
-    // private jwtService: JwtService,
+
   ) {}
-
-  // async register(dto: CreateStudentDto, file: Express.Multer.File) {
-  //   const hashedPassword = await bcrypt.hash(dto.password, 10);
-  //   const uploaded = await cloudinary.uploader.upload(file.path);
-  //   const student = new this.studentModel({
-  //     ...dto,
-  //     password: hashedPassword,
-  //     profilePic: uploaded.secure_url,
-  //     cloudinaryId: uploaded.public_id,
-  //   });
-  //   return { message: 'Registered successfully', student };
-  // }
-
 
   async register(dto: CreateStudentDto, file?: Express.Multer.File) {
   const existing = await this.studentModel.findOne({ email: dto.email });
   if (existing) throw new BadRequestException('Email already exists');
 
   const hashed = await bcrypt.hash(dto.password, 10);
-  // const imageUrl = file ? (await cloudinary.uploader.upload(file.path)).secure_url : '';
     let imageUrl = '';
   let cloudinaryId = '';
 
@@ -58,9 +43,32 @@ export class StudentService {
 
   return { message: 'Registered successfully' };
 }
+
+async createAdmin(data: {
+  fullName: string;
+  email: string;
+  password: string;
+  role: string;
+}) {
+  const existing = await this.studentModel.findOne({ email: data.email });
+  if (existing) throw new BadRequestException('Admin already exists');
+
+  const hashedPassword = await bcrypt.hash(data.password, 10);
+  const admin = new this.studentModel({
+    ...data,
+    password: hashedPassword,
+  });
+
+  await admin.save();
+  return admin;
+}
+
   async login(dto: LoginStudentDto, res: Response) {
   const student = await this.studentModel.findOne({ email: dto.email });
   if (!student) throw new UnauthorizedException('Invalid email');
+  if (student.isBlocked) {
+  throw new UnauthorizedException('Your account is blocked.');
+}
 
   const isMatch = await bcrypt.compare(dto.password, student.password);
   if (!isMatch) throw new UnauthorizedException('Invalid password');
@@ -81,13 +89,19 @@ export class StudentService {
 
   return res.status(200).json({
     message: 'Login successful',
+    token,
     student: {
       id: student._id,
       fullName: student.fullName,
       email: student.email,
       role: student.role,
+      profilePic: student.profilePic,
+    
+      
     },
   });
+
+  
 }
 
 
@@ -123,22 +137,40 @@ export class StudentService {
     return { message: 'Student deleted successfully' };
   }
 
-  // ✅ Update profile picture
-  async updateProfilePic(id: string, file: Express.Multer.File) {
-    const student = await this.studentModel.findById(id);
-    if (!student) throw new NotFoundException('Student not found');
 
-    // Delete old image if exists
-    if (student.cloudinaryId) {
-      await cloudinary.uploader.destroy(student.cloudinaryId);
-    }
+// ✅ Update profile picture
+async updateProfilePic(id: string, file: Express.Multer.File) {
+  const student = await this.studentModel.findById(id);
+  if (!student) throw new NotFoundException('Student not found');
 
-  // student.profilePic = file.path;
-  // student.cloudinaryId = (file as any).filename || '';
-
-    await student.save();
-    return { message: 'Profile picture updated', profilePic: student.profilePic };
+  // Delete old image if exists
+  if (student.cloudinaryId) {
+    await cloudinary.uploader.destroy(student.cloudinaryId);
   }
+
+  // Make public_id unique by adding a timestamp or user ID
+  const uniquePublicId = `${Date.now()}-${file.originalname.split('.')[0]}`;
+
+  // Upload new image to Cloudinary
+  const uploaded = await cloudinary.uploader.upload(file.path, {
+    folder: 'school-api',
+    transformation: [{ width: 500, height: 500, crop: 'limit' }],
+    public_id: uniquePublicId, // unique public_id
+  });
+
+  // Update student's profile picture and cloudinaryId
+  student.profilePic = uploaded.secure_url;
+  student.cloudinaryId = uploaded.public_id;
+
+  await student.save();
+
+  return {
+    message: 'Profile picture updated',
+    profilePic: student.profilePic,
+    filename: file.originalname,
+  };
+}
+
 
   async updateStudent(id: string, dto: Partial<CreateStudentDto>) {
   const student = await this.studentModel.findById(id);
@@ -150,12 +182,24 @@ export class StudentService {
     if (emailTaken) throw new BadRequestException('Email already exists');
   }
 
+
+  if (dto.password) {
+    dto.password = await bcrypt.hash(dto.password, 10);
+  }
+
   
 
-  Object.assign(student, dto); // Apply the updates
+  Object.assign(student, dto);
   await student.save();
 
-  return { message: 'Profile updated successfully', student };
+  return { message: 'Profile updated successfully', student: {
+      id: student._id,
+      fullName: student.fullName,
+      email: student.email,
+      role: student.role,
+      profilePic: student.profilePic,
+      cloudinaryId: student.cloudinaryId,
+    } };
 }
 
 async resetPassword(id: string, newPassword: string) {
@@ -174,11 +218,64 @@ async logout(req: Request, res: Response) {
 }
 
 
-    // return res.status(200).json({ message: 'User successfully logged out' });
-  
+async blockStudent(id: string) {
+  const student = await this.studentModel.findById(id);
+  if (!student) throw new NotFoundException('Student not found');
+  student.isBlocked = true;
+  await student.save();
+  return { message: 'Student blocked' };
+}
+
+async unblockStudent(id: string) {
+  const student = await this.studentModel.findById(id);
+  if (!student) throw new NotFoundException('Student not found');
+
+  student.isBlocked = false;
+  await student.save();
+
+  return { message: 'Student unblocked successfully' };
+}
+
+async findBlockedStudents() {
+  return this.studentModel.find({ isBlocked: true }).select('-password');
+}
 
 
   async findEmail(email: string): Promise<Student | null> {
   return this.studentModel.findOne({ where: { email } });
 }
+
+async promoteToAdmin(id: string) {
+  const user = await this.studentModel.findById(id);
+  if (!user) throw new NotFoundException('User not found');
+
+  user.role = 'admin';
+  await user.save();
+
+  return { message: 'User promoted to admin', user: {
+    id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role
+  }};
+}
+async depromoteToStudent(id: string) {
+  const user = await this.studentModel.findById(id);
+  if (!user) throw new NotFoundException('User not found');
+
+  user.role = 'student'; // reset role to student
+  await user.save();
+
+  return {
+    message: 'User depromoted to student',
+    user: {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+    },
+  };
+}
+
+
 }

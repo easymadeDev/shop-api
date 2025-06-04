@@ -16,7 +16,7 @@ import { StudentModule } from 'src/student/student.module';
     MongooseModule.forFeature([{ name: Student.name, schema: StudentSchema }]),
     PassportModule,  StudentModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET!,
+      secret: process.env.JWT_SECRET || 'super_secret_key_128',
       signOptions: { expiresIn: '1d' },
     }),
   ],

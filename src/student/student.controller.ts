@@ -3,9 +3,9 @@
 import { Controller, Post, Get, Body, Req, UploadedFile, UseGuards, UseInterceptors, Delete, Param, Res, Patch } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { CreateStudentDto } from './dto/create-student.dto';
-import { JwtAuthGuard } from 'src/auth/jwt-auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { storage } from 'src/utils/cloudinary';
+import { storage } from '../utils/cloudinary';
 import { Request, Response } from 'express';
 import { Express } from 'express';
 import { LoginStudentDto } from 'src/auth/dto/login-student.dto';
@@ -33,20 +33,16 @@ export class StudentController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'super admin')
   @Get()
   findAll() {
     return this.studentService.findAll();
   }
-  // @UseGuards(JwtAuthGuard)
-  // @Get('profile')
-  // async getProfile(@Req() req: Request) {
-  //   const user = req.user as { id: string };
-  //   return this.studentService.getProfile(user.id);
-  // }
+
 
    // Get a student by ID
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'super admin')
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.studentService.findById(id);
@@ -93,38 +89,37 @@ async updateStudentInfo(
 
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+
+@Roles('admin', 'super admin')
 @Patch('resetpassword/:id')
 async resetPassword(@Param('id') id: string, @Body('newPassword') newPassword: string) {
   return this.studentService.resetPassword(id, newPassword);
 }
 
-  // @UseGuards(JwtAuthGuard)
-  // @Get('profile')
-  // profile(@Req() req) {
-  //   return this.studentService.getProfile(req.user.id);
-  // }
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('super admin')
+@Patch('block/:id')
+blockStudent(@Param('id') id: string) {
+  return this.studentService.blockStudent(id);
+}
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('super admin')
+@Patch('unblock/:id')
+unblockStudent(@Param('id') id: string) {
+  return this.studentService.unblockStudent(id);
+}
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin', 'super admin')
+@Get('status/blocked')
+async getBlockedStudents() {
+ return this.studentService.findBlockedStudents();
+}
 
-  // @UseGuards(JwtAuthGuard)
-  // @Post('upload-profile')
-  // @UseInterceptors(FileInterceptor('file', { storage }))
-  // async uploadProfile(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
-  //   const user = req.user as { id: string };
-  //   const imageUrl = file.path;
-  //   return this.studentService.updateProfilePic(user.id, imageUrl);
-  // }
-
-  // @UseGuards(JwtAuthGuard)
-  // @Post('profile/upload')
-  // @UseInterceptors(FileInterceptor('image'))
-  // async uploadProfile(@UploadedFile() file: Express.Multer.File, @Req() req) {
-  //   return this.studentService.updateProfilePic(req.user.id, file);
-  // }
 
     // Delete a student and their profile picture
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('super admin')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.studentService.delete(id);
@@ -135,5 +130,19 @@ async resetPassword(@Param('id') id: string, @Body('newPassword') newPassword: s
 
     
   }
+  @UseGuards(JwtAuthGuard, RolesGuard)
+@Roles( 'super admin')
+@Patch('promote/:id')
+async promoteToAdmin(@Param('id') id: string) {
+  return this.studentService.promoteToAdmin(id);
+}
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('super admin')
+@Patch('depromote/:id')
+async depromoteToStudent(@Param('id') id: string) {
+  return this.studentService.depromoteToStudent(id);
+}
+
 
 }
